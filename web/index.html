@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ParkSight AI · CCTV Parking Intelligence</title>
+  <meta name="description" content="Web demo phát hiện phương tiện đỗ sai quy định từ camera CCTV.">
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="ambient ambient-one"></div>
+  <div class="ambient ambient-two"></div>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="ParkSight AI">
+      <span class="brand-mark"><i></i><i></i><i></i></span>
+      <span><b>ParkSight</b><small>CCTV INTELLIGENCE</small></span>
+    </a>
+    <div class="system-state"><span class="pulse"></span><span>LOCAL INFERENCE</span><b id="deviceBadge">CPU</b></div>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div>
+        <p class="eyebrow">FASTER R-CNN · BYTETRACK · TEMPORAL RULES</p>
+        <h1>Phát hiện đỗ xe sai quy định <em>từ video CCTV.</em></h1>
+        <p class="lead">Tải video, khoanh vùng cấm đỗ và theo dõi toàn bộ quá trình suy luận ngay trên server nội bộ.</p>
+      </div>
+      <div class="hero-metric"><span>MODEL</span><b>Custom MobileNetV3</b><small>FPN · trained from scratch</small></div>
+    </section>
+
+    <section class="workspace">
+      <aside class="control-panel panel">
+        <div class="panel-heading"><span>01</span><div><h2>Cấu hình</h2><p>Thiết lập nguồn và luật phát hiện</p></div></div>
+
+        <label class="field-label">Nguồn video</label>
+        <div class="segmented" role="group" aria-label="Nguồn video">
+          <button class="source-button active" data-source="demo" type="button">Video mẫu</button>
+          <button class="source-button" data-source="upload" type="button">Tải video</button>
+        </div>
+        <label class="upload-box hidden" id="uploadBox">
+          <input id="videoFile" type="file" accept="video/mp4,video/quicktime,video/x-msvideo,video/x-matroska">
+          <span class="upload-icon">↑</span>
+          <b id="uploadName">Chọn video CCTV</b>
+          <small>MP4, MOV, AVI hoặc MKV · tối đa 512 MB</small>
+        </label>
+
+        <div class="setting">
+          <div><label for="confidence">Confidence</label><output id="confidenceValue">0.30</output></div>
+          <input id="confidence" type="range" min="0.05" max="0.90" value="0.30" step="0.05">
+          <small>Giảm để giữ nhiều xe hơn, tăng để giảm dự đoán sai.</small>
+        </div>
+        <div class="setting-grid">
+          <label>Thời gian vi phạm<input id="parkingSeconds" type="number" min="1" max="3600" value="5"><span>giây</span></label>
+          <label>Ngưỡng chuyển động<input id="motionThreshold" type="number" min="0.1" max="500" value="8" step="0.5"><span>px</span></label>
+        </div>
+
+        <div class="roi-field">
+          <label for="roiText">Polygon vùng cấm đỗ</label>
+          <textarea id="roiText" rows="3" spellcheck="false">340,330;880,330;960,650;400,650</textarea>
+          <div class="inline-actions">
+            <button id="undoPoint" class="text-button" type="button">Hoàn tác điểm</button>
+            <button id="resetRoi" class="text-button" type="button">ROI mẫu</button>
+            <button id="clearRoi" class="text-button danger" type="button">Xóa</button>
+          </div>
+        </div>
+
+        <button id="runButton" class="run-button" type="button"><span>Chạy phân tích video</span><i>→</i></button>
+        <p class="form-error" id="formError" role="alert"></p>
+      </aside>
+
+      <div class="visual-panel panel">
+        <div class="panel-heading"><span>02</span><div><h2>Vùng quan sát</h2><p>Nhấp trực tiếp lên video để vẽ polygon</p></div><div class="legend"><i></i> NO PARKING ROI</div></div>
+        <div class="video-stage" id="videoStage">
+          <video id="sourceVideo" controls muted playsinline></video>
+          <canvas id="roiCanvas" aria-label="Vùng vẽ polygon"></canvas>
+          <div class="corner corner-tl"></div><div class="corner corner-tr"></div>
+          <div class="corner corner-bl"></div><div class="corner corner-br"></div>
+          <div class="camera-tag"><span class="record-dot"></span> CAM-DEMO-01</div>
+        </div>
+        <div class="stage-footer"><span>Nhấn vào khung hình để thêm điểm ROI</span><span id="videoMeta">—</span></div>
+      </div>
+    </section>
+
+    <section class="progress-panel panel hidden" id="progressPanel">
+      <div class="progress-copy"><span class="spinner"></span><div><h2 id="progressTitle">Đang xử lý video</h2><p id="progressMessage">Khởi tạo mô hình…</p></div><b id="progressTime">0.0s</b></div>
+      <div class="progress-track"><i id="progressBar"></i></div>
+      <pre id="liveLog"></pre>
+    </section>
+
+    <section class="results hidden" id="results">
+      <div class="section-title"><p class="eyebrow">ANALYSIS COMPLETE</p><h2>Kết quả phân tích</h2></div>
+      <div class="metric-grid">
+        <article><span>TRACKED VEHICLES</span><b id="trackedMetric">0</b><small>Track ID duy nhất</small></article>
+        <article class="alert-card"><span>VIOLATIONS</span><b id="violationMetric">0</b><small>Xe vi phạm duy nhất</small></article>
+        <article><span>MAX STOPPED</span><b id="stoppedMetric">0.0s</b><small>Thời gian đứng lâu nhất</small></article>
+        <article><span>OBSERVATIONS</span><b id="observationMetric">0</b><small>Dòng dữ liệu tracking</small></article>
+      </div>
+      <div class="result-grid">
+        <article class="result-video panel">
+          <div class="card-title"><div><h3>Video đã phân tích</h3><p>Khung đỏ biểu thị vi phạm</p></div><a id="downloadVideo" class="download" download>Tải MP4</a></div>
+          <video id="resultVideo" controls playsinline></video>
+        </article>
+        <article class="evidence-panel panel">
+          <div class="card-title"><div><h3>Bằng chứng vi phạm</h3><p>Ảnh được lưu tại thời điểm bắt đầu vi phạm</p></div><a id="downloadCsv" class="download" download>Tải CSV</a></div>
+          <div id="evidenceGallery" class="evidence-gallery"></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer><span>PARKSIGHT AI · INTERNAL DEMO</span><span>Dữ liệu được xử lý cục bộ trên server công ty</span></footer>
+  <script src="/static/app.js" defer></script>
+</body>
+</html>

@@ -1,0 +1,86 @@
+name: cctv-parking-trainer
+
+services:
+  train:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PYTORCH_IMAGE: "${PYTORCH_IMAGE:-pytorch/pytorch:2.5.1-cuda12.4-cudnn9-runtime}"
+    image: cctv-parking-trainer:latest
+    shm_size: "8gb"
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "${GPU_ID:-all}"
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+    volumes:
+      - "./data:/workspace/data:ro"
+      - "./input:/workspace/input:ro"
+      - "./models:/workspace/models"
+      - "./output:/workspace/output"
+      - "${TORCH_CACHE_DIR:-./.cache/torch}:/root/.cache/torch"
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_ID:-0}"]
+              capabilities: [gpu]
+    command:
+      - /bin/bash
+      - -lc
+      - >-
+        python -m src.train
+        --train-images /workspace/data/train/images
+        --train-annotations /workspace/data/annotations/train.json
+        --val-images /workspace/data/val/images
+        --val-annotations /workspace/data/annotations/val.json
+        --output /workspace/models/best.pth
+        --epochs ${EPOCHS:-20}
+        --batch-size ${BATCH_SIZE:-2}
+        --workers ${WORKERS:-4}
+        --lr ${LEARNING_RATE:-0.005}
+        --motorcycle-weight ${MOTORCYCLE_WEIGHT:-8.0}
+        --device cuda
+        --amp
+
+  gpu-check:
+    image: cctv-parking-trainer:latest
+    profiles: [tools]
+    environment:
+      NVIDIA_VISIBLE_DEVICES: "${GPU_ID:-all}"
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["${GPU_ID:-0}"]
+              capabilities: [gpu]
+    command:
+      - python
+      - -c
+      - >-
+        import torch;
+        assert torch.cuda.is_available(), 'CUDA is not visible inside Docker';
+        print('PyTorch:', torch.__version__);
+        print('CUDA:', torch.version.cuda);
+        print('GPU:', torch.cuda.get_device_name(0))
+
+  web:
+    image: cctv-parking-trainer:latest
+    shm_size: "8gb"
+    environment:
+      PYTORCH_CUDA_ALLOC_CONF: expandable_segments:True
+    volumes:
+      - ".:/workspace"
+    ports:
+      - "${WEB_PORT:-8501}:8501"
+    command:
+      - /bin/bash
+      - -lc
+      - >-
+        python web_demo.py
+        --host 0.0.0.0
+        --port 8501
+        --device ${WEB_DEVICE:-cpu}

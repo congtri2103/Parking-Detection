@@ -1,0 +1,11 @@
+torch>=2.2
+torchvision>=0.17
+opencv-python>=4.9
+numpy>=1.26
+Pillow>=10.0
+# ByteTrack API used by src/tracker.py (removed from supervision in 0.31).
+supervision>=0.23,<0.31
+tqdm>=4.66
+
+# Development / tests
+pytest>=8.0

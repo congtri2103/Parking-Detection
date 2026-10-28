@@ -1,0 +1,14 @@
+.git
+.venv*
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.cache/
+data/
+third_party/
+scripts/bdd100k/
+input/
+output/
+*.pth
+*.pt
+*.mp4

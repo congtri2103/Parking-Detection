@@ -1,0 +1,7 @@
+# torch and torchvision are supplied by the CUDA-enabled PyTorch base image.
+opencv-python-headless>=4.9
+numpy>=1.26
+Pillow>=10.0
+supervision>=0.23,<0.31
+tqdm>=4.66
+pytest>=8.0
